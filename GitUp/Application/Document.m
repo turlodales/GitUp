@@ -48,7 +48,7 @@
 #define kMaxProgressRefreshRate 10.0  // Hz
 
 #define kNavigateSegmentWidth 34.0
-#define kSearchFieldCompactWidth 180.0
+#define kSearchFieldCompactWidth 190.0
 #define kSearchFieldExpandedWidth 238.0
 
 typedef NS_ENUM(NSInteger, NavigationAction) {
@@ -746,9 +746,9 @@ static NSString* _StringFromRepositoryState(GCRepositoryState state) {
 // NSToolbar automatic validation fires very often and at unpredictable times so we just do everything by hand
 - (void)_updateToolBar {
   [_mainWindow.toolbar validateVisibleItems];
-  
-  NSSegmentedControl *segmentedControl = self.modeAndNavigationSegmentedControl;
-  NSString *windowMode = self.windowMode;
+
+  NSSegmentedControl* segmentedControl = self.modeAndNavigationSegmentedControl;
+  NSString* windowMode = self.windowMode;
   WindowModeID windowModeID = _WindowModeIDFromString(windowMode);
   if (_WindowModeIsPrimary(windowMode)) {
     [segmentedControl setImage:[NSImage imageNamed:@"circle.2.line.diagonal"] forSegment:kWindowModeID_Map];
@@ -761,7 +761,7 @@ static NSString* _StringFromRepositoryState(GCRepositoryState state) {
     [segmentedControl setSelectedSegment:windowModeID];
     segmentedControl.action = @selector(switchMode:);
   } else {
-    [segmentedControl setImage:[NSImage imageWithSystemSymbolName:@"arrow.down.forward.and.arrow.up.backward" accessibilityDescription: nil] forSegment:kNavigationAction_Exit];
+    [segmentedControl setImage:[NSImage imageWithSystemSymbolName:@"arrow.down.forward.and.arrow.up.backward" accessibilityDescription:nil] forSegment:kNavigationAction_Exit];
     [segmentedControl setImage:[NSImage imageWithSystemSymbolName:@"chevron.up" accessibilityDescription:nil] forSegment:kNavigationAction_Next];
     [segmentedControl setImage:[NSImage imageWithSystemSymbolName:@"chevron.down" accessibilityDescription:nil] forSegment:kNavigationAction_Previous];
     segmentedControl.trackingMode = NSSegmentSwitchTrackingMomentary;
@@ -769,12 +769,12 @@ static NSString* _StringFromRepositoryState(GCRepositoryState state) {
   }
 }
 
-- (NSSegmentedControl *)modeAndNavigationSegmentedControl {
-  return (NSSegmentedControl *)self.navigateItem.primaryControl;
+- (NSSegmentedControl*)modeAndNavigationSegmentedControl {
+  return (NSSegmentedControl*)self.navigateItem.primaryControl;
 }
 
 - (void)_didBecomeActive:(NSNotification*)notification {
-  /** 
+  /**
    async dispatch on the main queue so we don't block
    NSApplicationDidBecomeActiveNotification while updating the repos
    */

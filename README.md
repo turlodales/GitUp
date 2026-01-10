@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.org/git-up/GitUp.svg?branch=master)](https://travis-ci.org/git-up/GitUp)
+[![GitUp](https://github.com/git-up/GitUp/actions/workflows/build.yml/badge.svg)](https://github.com/git-up/GitUp/actions/workflows/build.yml)
+[![GitUpKit Tests](https://github.com/git-up/GitUp/actions/workflows/test.yml/badge.svg)](https://github.com/git-up/GitUp/actions/workflows/test.yml)
 
 GitUp
 =====

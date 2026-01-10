@@ -125,15 +125,6 @@ static NSMutableDictionary* _patternHelp = nil;
   [self _reloadConfig];
 }
 
-- (void)viewDidResize {
-  if (self.viewVisible && !self.liveResizing) {
-    [NSAnimationContext beginGrouping];
-    [[NSAnimationContext currentContext] setDuration:0.0];  // Prevent animations in case the view is actually not on screen yet (e.g. in a hidden tab)
-    [_tableView noteHeightOfRowsWithIndexesChanged:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, _config.count)]];
-    [NSAnimationContext endGrouping];
-  }
-}
-
 - (void)repositoryDidChange {
   if (self.viewVisible) {
     [self _reloadConfig];
@@ -146,10 +137,6 @@ static NSMutableDictionary* _patternHelp = nil;
   _config = nil;
   _set = nil;
   [_tableView reloadData];
-}
-
-- (void)viewDidFinishLiveResize {
-  [_tableView noteHeightOfRowsWithIndexesChanged:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, _config.count)]];
 }
 
 - (BOOL)_selectOptionWithLevel:(GCConfigLevel)level variable:(NSString*)variable {
@@ -249,17 +236,6 @@ static NSMutableDictionary* _patternHelp = nil;
   view.optionTextField.attributedStringValue = string;
   view.helpTextField.attributedStringValue = [[NSAttributedString alloc] initWithString:[self.class helpForVariable:option.variable] attributes:_helpAttributes];
   return view;
-}
-
-- (CGFloat)tableView:(NSTableView*)tableView heightOfRow:(NSInteger)row {
-  GCConfigOption* option = _config[row];
-  _cachedCellView.frame = NSMakeRect(0, 0, [_tableView.tableColumns[0] width], 1000);
-  NSTextField* textField = _cachedCellView.helpTextField;
-  NSRect frame = textField.frame;
-  textField.attributedStringValue = [[NSAttributedString alloc] initWithString:[self.class helpForVariable:option.variable] attributes:_helpAttributes];
-  NSSize size = [textField.cell cellSizeForBounds:NSMakeRect(0, 0, frame.size.width, HUGE_VALF)];
-  CGFloat delta = ceilf(size.height) - frame.size.height;
-  return _cachedCellView.frame.size.height + delta;
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification*)notification {
