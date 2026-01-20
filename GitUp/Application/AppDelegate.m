@@ -42,7 +42,7 @@
 #define kToolName @"gitup"
 #define kToolInstallPath @"/usr/local/bin/" kToolName
 
-@interface AppDelegate () <UNUserNotificationCenterDelegate, SUUpdaterDelegate, NSMenuItemValidation>
+@interface AppDelegate () <UNUserNotificationCenterDelegate, SPUUpdaterDelegate, NSMenuItemValidation>
 @property(nonatomic, strong) AboutWindowController* aboutWindowController;
 @property(nonatomic, strong) CloneWindowController* cloneWindowController;
 @property(nonatomic, strong) PreferencesWindowController* preferencesWindowController;
@@ -50,7 +50,7 @@
 @end
 
 @implementation AppDelegate {
-  SUUpdater* _updater;
+  SPUStandardUpdaterController* _updaterController;
   BOOL _manualCheck;
 
   CFMessagePortRef _messagePort;
@@ -74,7 +74,7 @@
 
 - (void)didChangeReleaseChannel:(BOOL)didChange {
   if (didChange) {
-    [_updater checkForUpdatesInBackground];
+    [_updaterController.updater checkForUpdatesInBackground];
   }
 }
 
@@ -110,7 +110,7 @@
   // Without this line, GitUp would instead immediately exit, with no crash log.
   // libgit2 has what looks like a built-in solution (`disable_signals()`), but it doesn't seem to work for us.
   signal(SIGPIPE, SIG_IGN);
-  
+
   NSDictionary* defaults = @{
     GICommitMessageViewUserDefaultKey_ShowInvisibleCharacters : @(YES),
     GICommitMessageViewUserDefaultKey_ShowMargins : @(YES),
@@ -178,20 +178,20 @@
 }
 
 - (void)_showNotificationWithTitle:(NSString*)title action:(SEL)action message:(NSString*)format, ... NS_FORMAT_FUNCTION(3, 4) {
-    va_list arguments;
-    va_start(arguments, format);
-    NSString *string = [[NSString alloc] initWithFormat:format arguments:arguments];
-    va_end(arguments);
+  va_list arguments;
+  va_start(arguments, format);
+  NSString* string = [[NSString alloc] initWithFormat:format arguments:arguments];
+  va_end(arguments);
 
-    UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
-    content.title = title;
-    content.body = string;
-    if (action) {
-      content.userInfo = @{kNotificationUserInfoKey_Action : NSStringFromSelector(action)};
-    }
+  UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+  content.title = title;
+  content.body = string;
+  if (action) {
+    content.userInfo = @{kNotificationUserInfoKey_Action : NSStringFromSelector(action)};
+  }
 
-    UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:[[NSUUID UUID] UUIDString] content:content trigger:nil];
-    [[UNUserNotificationCenter currentNotificationCenter] addNotificationRequest:request withCompletionHandler:nil];
+  UNNotificationRequest* request = [UNNotificationRequest requestWithIdentifier:[[NSUUID UUID] UUIDString] content:content trigger:nil];
+  [[UNUserNotificationCenter currentNotificationCenter] addNotificationRequest:request withCompletionHandler:nil];
 }
 
 #pragma mark - NSApplicationDelegate
@@ -205,13 +205,14 @@
 #if !DEBUG
   // Initialize Sparkle and check for update immediately
   if (![[NSUserDefaults standardUserDefaults] boolForKey:kUserDefaultsKey_DisableSparkle]) {
-    _updater = [SUUpdater sharedUpdater];
-    _updater.delegate = self;
-    _updater.automaticallyChecksForUpdates = YES;
-    _updater.sendsSystemProfile = NO;
+    _updaterController = [[SPUStandardUpdaterController alloc] initWithStartingUpdater:YES
+                                                                       updaterDelegate:self
+                                                                    userDriverDelegate:nil];
+    _updaterController.updater.automaticallyChecksForUpdates = YES;
+    _updaterController.updater.sendsSystemProfile = NO;
 
     _manualCheck = NO;
-    [_updater checkForUpdatesInBackground];
+    [_updaterController.updater checkForUpdatesInBackground];
   }
 #endif
 
@@ -219,15 +220,15 @@
   [GILaunchServicesLocator setup];
 
   // Initialize user notification center
-  UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+  UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
   [center setDelegate:self];
-  
+
   [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge)
-    completionHandler:^(BOOL granted, NSError * _Nullable error) {
-      if (!granted) {
-        XLOG_INFO(@"User denied notification permissions");
-      }
-    }];
+                        completionHandler:^(BOOL granted, NSError* _Nullable error) {
+                          if (!granted) {
+                            XLOG_INFO(@"User denied notification permissions");
+                          }
+                        }];
 
   // Register finder context menu services.
   [NSApplication sharedApplication].servicesProvider = [ServicesProvider new];
@@ -369,7 +370,7 @@ static CFDataRef _MessagePortCallBack(CFMessagePortRef local, SInt32 msgid, CFDa
 
 - (BOOL)validateMenuItem:(NSMenuItem*)menuItem {
   if (menuItem.action == @selector(checkForUpdates:)) {
-    return [_updater validateMenuItem:menuItem];
+    return _updaterController.updater.canCheckForUpdates;
   }
   return YES;
 }
@@ -480,7 +481,7 @@ static CFDataRef _MessagePortCallBack(CFMessagePortRef local, SInt32 msgid, CFDa
 
 - (IBAction)checkForUpdates:(id)sender {
   _manualCheck = YES;
-  [_updater checkForUpdatesInBackground];
+  [_updaterController checkForUpdates:sender];
 }
 
 - (IBAction)installTool:(id)sender {
@@ -529,20 +530,20 @@ static CFDataRef _MessagePortCallBack(CFMessagePortRef local, SInt32 msgid, CFDa
   }
 }
 
-#pragma mark - SUUpdaterDelegate
+#pragma mark - SPUUpdaterDelegate
 
-- (NSString*)feedURLStringForUpdater:(SUUpdater*)updater {
+- (NSString*)feedURLStringForUpdater:(SPUUpdater*)updater {
   NSString* channel = [[NSUserDefaults standardUserDefaults] stringForKey:kUserDefaultsKey_ReleaseChannel];
   return [NSString stringWithFormat:kURL_AppCast, channel];
 }
 
-- (void)updater:(SUUpdater*)updater didFindValidUpdate:(SUAppcastItem*)item {
+- (void)updater:(SPUUpdater*)updater didFindValidUpdate:(SUAppcastItem*)item {
   _manualCheck = NO;
   NSString* channel = [[NSUserDefaults standardUserDefaults] stringForKey:kUserDefaultsKey_ReleaseChannel];
   XLOG_INFO(@"Did find app update on channel '%@' for version %@", channel, item.versionString);
 }
 
-- (void)updaterDidNotFindUpdate:(SUUpdater*)updater {
+- (void)updaterDidNotFindUpdate:(SPUUpdater*)updater error:(NSError*)error {
   NSString* channel = [[NSUserDefaults standardUserDefaults] stringForKey:kUserDefaultsKey_ReleaseChannel];
   XLOG_VERBOSE(@"App is up-to-date at version %@ on channel '%@'", [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"], channel);
   if (_manualCheck) {
@@ -555,28 +556,29 @@ static CFDataRef _MessagePortCallBack(CFMessagePortRef local, SInt32 msgid, CFDa
   }
 }
 
-- (void)updater:(SUUpdater*)updater didAbortWithError:(NSError*)error {
+- (void)updater:(SPUUpdater*)updater didAbortWithError:(NSError*)error {
   NSString* channel = [[NSUserDefaults standardUserDefaults] stringForKey:kUserDefaultsKey_ReleaseChannel];
   if (![error.domain isEqualToString:SUSparkleErrorDomain] || (error.code != SUNoUpdateError)) {
     XLOG_ERROR(@"App update on channel '%@' aborted: %@", channel, error);
   }
 }
 
-- (void)updater:(SUUpdater*)updater willInstallUpdate:(SUAppcastItem*)item {
+- (void)updater:(SPUUpdater*)updater willInstallUpdate:(SUAppcastItem*)item {
   XLOG_INFO(@"Installing app update for version %@", item.versionString);
 }
 
-- (void)updater:(SUUpdater*)updater willInstallUpdateOnQuit:(SUAppcastItem*)item immediateInstallationInvocation:(NSInvocation*)invocation {
+- (BOOL)updater:(SPUUpdater*)updater willInstallUpdateOnQuit:(SUAppcastItem*)item immediateInstallationBlock:(void (^)(void))installationBlock {
   XLOG_INFO(@"Will install app update for version %@ on quit", item.versionString);
   [self _showNotificationWithTitle:NSLocalizedString(@"Update Available", nil)
                             action:NULL
                            message:NSLocalizedString(@"Relaunch GitUp to update to version %@ (%@).", nil), item.displayVersionString, item.versionString];
+  return NO;
 }
 
 #pragma mark - UNUserNotificationCenterDelegate
 
-- (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void(^)(void))completionHandler {
-  NSString *action = response.notification.request.content.userInfo[kNotificationUserInfoKey_Action];
+- (void)userNotificationCenter:(UNUserNotificationCenter*)center didReceiveNotificationResponse:(UNNotificationResponse*)response withCompletionHandler:(void (^)(void))completionHandler {
+  NSString* action = response.notification.request.content.userInfo[kNotificationUserInfoKey_Action];
   if (action) {
     [NSApp sendAction:NSSelectorFromString(action) to:self from:nil];
   }
